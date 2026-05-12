@@ -1,0 +1,275 @@
+
+# ==========================================================
+# Hospital Readmission Risk Prediction for Chronic Disease Patients
+# Author: Joan Joshua
+# ==========================================================
+
+import numpy as np
+import pandas as pd
+import random
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, roc_auc_score, confusion_matrix,
+    classification_report
+)
+
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+
+# -----------------------------
+# 1. Generate Synthetic Dataset
+# -----------------------------
+
+np.random.seed(42)
+random.seed(42)
+
+N = 15000
+
+ages = np.random.randint(25, 90, N)
+gender = np.random.choice(['Male', 'Female'], N)
+
+chronic_disease = np.random.choice(
+    ['Diabetes', 'Hypertension', 'Heart Disease', 'COPD', 'CKD'],
+    N,
+    p=[0.25, 0.30, 0.20, 0.15, 0.10]
+)
+
+bmi = np.round(np.random.normal(28, 6, N), 1)
+length_of_stay = np.random.randint(1, 20, N)
+prior_admissions = np.random.poisson(2, N)
+medication_count = np.random.randint(1, 15, N)
+lab_test_abnormalities = np.random.randint(0, 10, N)
+comorbidity_score = np.random.randint(0, 8, N)
+medication_adherence = np.round(np.random.uniform(40, 100, N), 1)
+smoking_status = np.random.choice(['Never', 'Former', 'Current'], N)
+insurance_type = np.random.choice(
+    ['Private', 'Public', 'None'], N,
+    p=[0.50, 0.40, 0.10]
+)
+
+blood_pressure = np.random.randint(90, 180, N)
+glucose_level = np.random.randint(70, 300, N)
+heart_rate = np.random.randint(55, 140, N)
+
+# -----------------------------
+# 2. Create Readmission Target
+# -----------------------------
+
+risk_score = (
+    (ages > 65) * 1.2 +
+    (length_of_stay > 7) * 1.5 +
+    (prior_admissions > 2) * 2.0 +
+    (medication_adherence < 60) * 1.8 +
+    (comorbidity_score > 4) * 1.6 +
+    (lab_test_abnormalities > 5) * 1.4 +
+    (smoking_status == 'Current') * 1.2 +
+    (chronic_disease == 'Heart Disease') * 1.3 +
+    (chronic_disease == 'COPD') * 1.2 +
+    np.random.normal(0, 1, N)
+)
+
+probability = 1 / (1 + np.exp(-risk_score / 4))
+readmitted = np.random.binomial(1, probability)
+
+# -----------------------------
+# 3. Create DataFrame
+# -----------------------------
+
+df = pd.DataFrame({
+    'Age': ages,
+    'Gender': gender,
+    'Chronic_Disease': chronic_disease,
+    'BMI': bmi,
+    'Length_of_Stay': length_of_stay,
+    'Prior_Admissions': prior_admissions,
+    'Medication_Count': medication_count,
+    'Lab_Test_Abnormalities': lab_test_abnormalities,
+    'Comorbidity_Score': comorbidity_score,
+    'Medication_Adherence': medication_adherence,
+    'Smoking_Status': smoking_status,
+    'Insurance_Type': insurance_type,
+    'Blood_Pressure': blood_pressure,
+    'Glucose_Level': glucose_level,
+    'Heart_Rate': heart_rate,
+    'Readmitted_30_Days': readmitted
+})
+
+# Save dataset
+csv_file = 'hospital_readmission_dataset.csv'
+df.to_csv(csv_file, index=False)
+print(f'Dataset saved as {csv_file}')
+
+# -----------------------------
+# 4. Exploratory Data Analysis
+# -----------------------------
+
+print(df.head())
+print(df.info())
+print(df.describe())
+print(df['Readmitted_30_Days'].value_counts())
+
+plt.figure(figsize=(6,4))
+sns.countplot(x='Readmitted_30_Days', data=df)
+plt.title('30-Day Readmission Distribution')
+plt.show()
+
+plt.figure(figsize=(10,5))
+sns.histplot(df['Age'], bins=30, kde=True)
+plt.title('Patient Age Distribution')
+plt.show()
+
+plt.figure(figsize=(10,5))
+sns.boxplot(x='Readmitted_30_Days', y='Length_of_Stay', data=df)
+plt.title('Length of Stay vs Readmission')
+plt.show()
+
+plt.figure(figsize=(10,5))
+sns.boxplot(x='Readmitted_30_Days', y='Medication_Adherence', data=df)
+plt.title('Medication Adherence vs Readmission')
+plt.show()
+
+# -----------------------------
+# 5. Feature Engineering
+# -----------------------------
+
+X = df.drop('Readmitted_30_Days', axis=1)
+y = df['Readmitted_30_Days']
+
+categorical_features = [
+    'Gender',
+    'Chronic_Disease',
+    'Smoking_Status',
+    'Insurance_Type'
+]
+
+numerical_features = [col for col in X.columns if col not in categorical_features]
+
+# One-hot encode categorical features
+X = pd.get_dummies(X, drop_first=True)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# -----------------------------
+# 6. Train Models
+# -----------------------------
+
+models = {
+    'Logistic Regression': LogisticRegression(max_iter=1000),
+    'Random Forest': RandomForestClassifier(
+        n_estimators=200,
+        random_state=42
+    ),
+    'Gradient Boosting': GradientBoostingClassifier(
+        n_estimators=100,
+        random_state=42
+    )
+}
+
+results = []
+
+for name, model in models.items():
+    print(f'\nTraining {name}...')
+
+    if name == 'Logistic Regression':
+        model.fit(X_train_scaled, y_train)
+        preds = model.predict(X_test_scaled)
+        probs = model.predict_proba(X_test_scaled)[:, 1]
+    else:
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+        probs = model.predict_proba(X_test)[:, 1]
+
+    accuracy = accuracy_score(y_test, preds)
+    precision = precision_score(y_test, preds)
+    recall = recall_score(y_test, preds)
+    f1 = f1_score(y_test, preds)
+    roc_auc = roc_auc_score(y_test, probs)
+
+    results.append([
+        name,
+        accuracy,
+        precision,
+        recall,
+        f1,
+        roc_auc
+    ])
+
+    print(classification_report(y_test, preds))
+
+    cm = confusion_matrix(y_test, preds)
+
+    plt.figure(figsize=(5,4))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title(f'Confusion Matrix - {name}')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.show()
+
+# -----------------------------
+# 7. Compare Model Performance
+# -----------------------------
+
+results_df = pd.DataFrame(
+    results,
+    columns=[
+        'Model',
+        'Accuracy',
+        'Precision',
+        'Recall',
+        'F1 Score',
+        'ROC AUC'
+    ]
+)
+
+print('\nModel Comparison')
+print(results_df.sort_values(by='ROC AUC', ascending=False))
+
+plt.figure(figsize=(10,5))
+sns.barplot(data=results_df, x='Model', y='ROC AUC')
+plt.title('Model ROC-AUC Comparison')
+plt.show()
+
+# -----------------------------
+# 8. Feature Importance
+# -----------------------------
+
+rf_model = models['Random Forest']
+feature_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': rf_model.feature_importances_
+})
+
+feature_importance = feature_importance.sort_values(
+    by='Importance',
+    ascending=False
+)
+
+print(feature_importance.head(15))
+
+plt.figure(figsize=(10,8))
+sns.barplot(
+    data=feature_importance.head(15),
+    x='Importance',
+    y='Feature'
+)
+plt.title('Top 15 Important Features')
+plt.show()
+
+print('\nProject Completed Successfully!')
