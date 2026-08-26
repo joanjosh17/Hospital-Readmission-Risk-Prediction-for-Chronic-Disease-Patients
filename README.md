@@ -57,7 +57,7 @@ Hospital-Readmission-Risk-Prediction-for-Chronic-Disease-Patients/charts/
 
 ## 📊 1. Readmission Distribution
 
-![Figure 1](Hospital-Readmission-Risk-Prediction-for-Chronic-Disease-Patients/charts/Figure_1.png)
+![Figure 1](charts/Figure_1.png)
 
 ---
 
