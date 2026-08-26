@@ -99,7 +99,7 @@ Hospital-Readmission-Risk-Prediction-for-Chronic-Disease-Patients/charts/
 
 ## 📊 8. Model ROC-AUC Comparison
 
-![Figure 8](Hospital-Readmission-Risk-Prediction-for-Chronic-Disease-Patients/charts/Figure_8.png)
+![Figure 8](Hospital-Readmission-Risk-Prediction-for-Chronic-Disease-Patients/charts/figure_8.png)
 
 ---
 
